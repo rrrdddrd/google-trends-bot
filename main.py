@@ -21,8 +21,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Telegram bot token and chat ID (loaded from environment variables)
-BOT_TOKEN = os.getenv("BOT_TOKEN", "7634402374:AAGzwu9D-s_1MLgVWwoKl4WkvD8L1b0rUXA")  # Fixed token
-CHAT_ID = os.getenv("CHAT_ID", "8151125157")  # Fallback if env var not set
+BOT_TOKEN = os.getenv("BOT_TOKEN", "7634402374:AAGzwu9D-s_1MLgVWwoKl4WkvD8L1b0rUXA")
+CHAT_ID = os.getenv("CHAT_ID", "8151125157")
 
 # Rotate User-Agent to avoid blocks
 USER_AGENTS = [
@@ -74,7 +74,8 @@ async def send_trends() -> None:
             message = trends[0] if trends and len(trends) == 1 else "Could not fetch trends."
             logger.warning(f"Prepared message: {message}")
 
-        await bot.send_message(chat_id=CHAT_ID, text=message)
+        # Removed 'await' since send_message is synchronous in v13.7
+        bot.send_message(chat_id=CHAT_ID, text=message)
         logger.info(f"Message sent to chat ID: {CHAT_ID}")
 
     except TelegramError as e:
