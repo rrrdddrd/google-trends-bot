@@ -21,7 +21,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Telegram bot token and chat ID (loaded from environment variables)
-BOT_TOKEN = os.getenv("BOT_TOKEN", "7634402374:AAGzwu9D-s_1MLgVWwoKl4Wkv  # Fallback if env var not set
+BOT_TOKEN = os.getenv("BOT_TOKEN", "7634402374:AAGzwu9D-s_1MLgVWwoKl4WkvD8L1b0rUXA")  # Fixed token
 CHAT_ID = os.getenv("CHAT_ID", "8151125157")  # Fallback if env var not set
 
 # Rotate User-Agent to avoid blocks
