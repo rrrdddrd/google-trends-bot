@@ -9,6 +9,7 @@ import threading
 from random import choice
 import os
 from flask import Flask
+from datetime import datetime, timedelta
 
 # Configure logging to file and console
 logging.basicConfig(
@@ -91,14 +92,27 @@ async def send_trends() -> None:
         logger.error(f"An unexpected error occurred: {e}")
 
 def run_scheduler():
-    """Run the scheduler to send trends every hour with retry logic."""
+    """Run the scheduler to send trends at the start of each clock hour."""
     while True:
         try:
+            # Calculate seconds until the next hour
+            now = datetime.now()
+            next_hour = (now + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
+            seconds_until_next_hour = (next_hour - now).total_seconds()
+
+            # Sleep until the next hour
+            logger.info(f"Waiting {seconds_until_next_hour:.0f} seconds until {next_hour.strftime('%H:%00')}")
+            time.sleep(seconds_until_next_hour)
+
+            # Send trends at the start of the hour
             asyncio.run(send_trends())
+
+            # Sleep for 1 hour (3600 seconds) for subsequent sends
+            time.sleep(3600)
+
         except Exception as e:
             logger.error(f"Scheduler error: {e}. Retrying in 60 seconds...")
             time.sleep(60)  # Wait before retrying
-        time.sleep(3600)  # Wait 1 hour between runs
 
 if __name__ == "__main__":
     logger.info("Starting the bot...")
