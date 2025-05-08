@@ -9,13 +9,14 @@ import threading
 from random import choice
 import os
 from flask import Flask
+from datetime import datetime
 
 # Configure logging to file and console
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO,
+    level=logging.DEBUG,  # Increased to DEBUG
     handlers=[
-        logging.FileHandler("bot.log"),  # Save logs to bot.log
+        logging.FileHandler("/tmp/bot.log", mode='a'),  # Use /tmp/ for Render
         logging.StreamHandler()  # Print to console
     ]
 )
@@ -37,17 +38,27 @@ app = Flask(__name__)
 
 @app.route('/')
 def keep_alive():
+    logger.debug("Received request to keep_alive endpoint")
     return "Bot is running!"
+
+@app.route('/health')
+def health_check():
+    logger.debug("Health check endpoint called")
+    return f"Bot running since {start_time.strftime('%Y-%m-%d %H:%M:%S')}"
+
+# Global start time for health check
+start_time = datetime.now()
+logger.info(f"Process started at {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
 async def get_google_trends() -> list:
     """Scrape top 10 trending topics from getdaytrends.com for the US."""
-    url = "https://getdaytrends.com/united-states/"
-    headers = {"User-Agent": choice(USER_AGENTS)}
-    logger.info("Fetching Google Trends via scraping...")
+    logger.debug("Fetching Google Trends via scraping...")
     try:
+        url = "https://getdaytrends.com/united-states/"
+        headers = {"User-Agent": choice(USER_AGENTS)}
         response = requests.get(url, headers=headers, timeout=10)
         if response.status_code != 200:
-            logger.error(f"Failed to fetch page. Status code: {response_status_code}")
+            logger.error(f"Failed to fetch page. Status code: {response.status_code}")
             return [f"Failed to fetch page: {response.status_code}"]
 
         soup = BeautifulSoup(response.text, "html.parser")
@@ -70,7 +81,7 @@ async def get_google_trends() -> list:
 
 async def send_trends() -> None:
     """Fetches and sends the Google Trends list."""
-    logger.info("Sending trends...")
+    logger.debug("Sending trends...")
     try:
         bot = Bot(token=BOT_TOKEN)
         trends = await get_google_trends()
@@ -95,9 +106,17 @@ def run_scheduler():
     logger.info("Starting scheduler...")
     while True:
         try:
+            # Log current time and process status
+            logger.debug(f"Scheduler loop running at {datetime.now().strftime('%H:%M:%S')}")
+
+            # Send trends
+            logger.info("Executing send_trends...")
             asyncio.run(send_trends())
-            logger.info("Waiting 180 seconds for next send")
-            time.sleep(180)  # Wait 3 minutes between runs
+
+            # Sleep for 3 minutes
+            logger.debug("Waiting 180 seconds for next send...")
+            time.sleep(180)
+
         except Exception as e:
             logger.error(f"Scheduler error: {e}. Retrying in 30 seconds...")
             time.sleep(30)  # Wait before retrying
@@ -110,7 +129,7 @@ if __name__ == "__main__":
         import telegram
         import flask
     except ImportError:
-        logger.info("Installing required packages...")
+        logger.error("Required packages missing. Installing...")
         import os
         os.system("pip install requests beautifulsoup4 python-telegram-bot==20.8 flask==2.3.2")
 
@@ -119,12 +138,14 @@ if __name__ == "__main__":
         target=lambda: app.run(
             host='0.0.0.0',
             port=int(os.getenv("PORT", 8080)),
-            debug=False
+            debug=False,
+            use_reloader=False  # Prevent Flask from restarting
         ),
         daemon=True
     ).start()
 
     # Send trends immediately for testing
+    logger.info("Sending initial trends message...")
     asyncio.run(send_trends())
 
     # Run scheduler in the main thread
