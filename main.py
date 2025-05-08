@@ -9,7 +9,6 @@ import threading
 from random import choice
 import os
 from flask import Flask
-from datetime import datetime, timedelta
 
 # Configure logging to file and console
 logging.basicConfig(
@@ -48,7 +47,7 @@ async def get_google_trends() -> list:
     try:
         response = requests.get(url, headers=headers, timeout=10)
         if response.status_code != 200:
-            logger.error(f"Failed to fetch page. Status code: {response.status_code}")
+            logger.error(f"Failed to fetch page. Status code: {response_status_code}")
             return [f"Failed to fetch page: {response.status_code}"]
 
         soup = BeautifulSoup(response.text, "html.parser")
@@ -92,27 +91,16 @@ async def send_trends() -> None:
         logger.error(f"An unexpected error occurred: {e}")
 
 def run_scheduler():
-    """Run the scheduler to send trends at the start of each clock hour."""
+    """Run the scheduler to send trends every 3 minutes from start time."""
+    logger.info("Starting scheduler...")
     while True:
         try:
-            # Calculate seconds until the next hour
-            now = datetime.now()
-            next_hour = (now + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
-            seconds_until_next_hour = (next_hour - now).total_seconds()
-
-            # Sleep until the next hour
-            logger.info(f"Waiting {seconds_until_next_hour:.0f} seconds until {next_hour.strftime('%H:%00')}")
-            time.sleep(seconds_until_next_hour)
-
-            # Send trends at the start of the hour
             asyncio.run(send_trends())
-
-            # Sleep for 1 hour (3600 seconds) for subsequent sends
-            time.sleep(3600)
-
+            logger.info("Waiting 180 seconds for next send")
+            time.sleep(180)  # Wait 3 minutes between runs
         except Exception as e:
-            logger.error(f"Scheduler error: {e}. Retrying in 60 seconds...")
-            time.sleep(60)  # Wait before retrying
+            logger.error(f"Scheduler error: {e}. Retrying in 30 seconds...")
+            time.sleep(30)  # Wait before retrying
 
 if __name__ == "__main__":
     logger.info("Starting the bot...")
@@ -136,12 +124,8 @@ if __name__ == "__main__":
         daemon=True
     ).start()
 
-    # Start scheduler in a background thread
-    threading.Thread(target=run_scheduler, daemon=True).start()
-
     # Send trends immediately for testing
     asyncio.run(send_trends())
 
-    # Keep script running
-    while True:
-        time.sleep(60)
+    # Run scheduler in the main thread
+    run_scheduler()
