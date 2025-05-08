@@ -8,6 +8,7 @@ import time
 import threading
 from random import choice
 import os
+from flask import Flask
 
 # Configure logging to file and console
 logging.basicConfig(
@@ -30,6 +31,13 @@ USER_AGENTS = [
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36",
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.101 Safari/537.36"
 ]
+
+# Flask app for Render Web Service
+app = Flask(__name__)
+
+@app.route('/')
+def keep_alive():
+    return "Bot is running!"
 
 async def get_google_trends() -> list:
     """Scrape top 10 trending topics from getdaytrends.com for the US."""
@@ -74,8 +82,7 @@ async def send_trends() -> None:
             message = trends[0] if trends and len(trends) == 1 else "Could not fetch trends."
             logger.warning(f"Prepared message: {message}")
 
-        # Removed 'await' since send_message is synchronous in v13.7
-        bot.send_message(chat_id=CHAT_ID, text=message)
+        await bot.send_message(chat_id=CHAT_ID, text=message)  # Async in v20.8
         logger.info(f"Message sent to chat ID: {CHAT_ID}")
 
     except TelegramError as e:
@@ -99,10 +106,21 @@ if __name__ == "__main__":
         import requests
         import bs4
         import telegram
+        import flask
     except ImportError:
         logger.info("Installing required packages...")
         import os
-        os.system("pip install requests beautifulsoup4 python-telegram-bot==13.7")
+        os.system("pip install requests beautifulsoup4 python-telegram-bot==20.8 flask==2.3.2")
+
+    # Start Flask server in a separate thread
+    threading.Thread(
+        target=lambda: app.run(
+            host='0.0.0.0',
+            port=int(os.getenv("PORT", 8080)),
+            debug=False
+        ),
+        daemon=True
+    ).start()
 
     # Start scheduler in a background thread
     threading.Thread(target=run_scheduler, daemon=True).start()
