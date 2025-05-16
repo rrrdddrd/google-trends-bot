@@ -7,26 +7,30 @@ app = Flask(__name__)
 
 @app.route("/")
 def send_trending():
-    # Google Trends RSS (Korea)
     RSS_URL = 'https://trends.google.com/trending/rss?geo=KR'
-    TELEGRAM_BOT_TOKEN = '7634402374:AAGzwu9D-s_1MLgVWwoKl4WkvD8L1b0rUKA'
-    TELEGRAM_CHAT_ID = '8151125156'
+    TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+    TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
+
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        return "Bot token or chat ID not set!"
 
     feed = feedparser.parse(RSS_URL)
     entries = feed.entries[:10]
 
-    # Format top 10 keywords
     message = "Top 10 Google Trending Searches in Korea:\n"
     for i, entry in enumerate(entries, 1):
         message += f"{i}. {entry.title}\n"
 
-    # Send to Telegram
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
         'chat_id': TELEGRAM_CHAT_ID,
         'text': message
     }
-    requests.post(url, data=payload)
+
+    response = requests.post(url, data=payload)
+
+    if response.status_code != 200:
+        return f"Failed to send message: {response.text}"
 
     return "Sent to Telegram!"
 
