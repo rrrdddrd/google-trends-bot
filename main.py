@@ -8,8 +8,8 @@ app = Flask(__name__)
 @app.route("/")
 def send_trending():
     RSS_URL = 'https://trends.google.com/trending/rss?geo=KR'
-    TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
-    TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
+    TELEGRAM_BOT_TOKEN = os.environ.get('BOT_TOKEN')
+    TELEGRAM_CHAT_ID = os.environ.get('CHAT_ID')
 
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         return "Bot token or chat ID not set!"
