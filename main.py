@@ -1,152 +1,28 @@
-import asyncio
-import logging
-import requests
-from bs4 import BeautifulSoup
-from telegram import Bot
-from telegram.error import TelegramError
-import time
-import threading
-from random import choice
-import os
+# app.py
 from flask import Flask
-from datetime import datetime
+import feedparser
+import requests
 
-# Configure logging to file and console
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.DEBUG,  # Increased to DEBUG
-    handlers=[
-        logging.FileHandler("/tmp/bot.log", mode='a'),  # Use /tmp/ for Render
-        logging.StreamHandler()  # Print to console
-    ]
-)
-logger = logging.getLogger(__name__)
-
-# Telegram bot token and chat ID (loaded from environment variables)
-BOT_TOKEN = os.getenv("BOT_TOKEN", "7634402374:AAGzwu9D-s_1MLgVWwoKl4WkvD8L1b0rUXA")
-CHAT_ID = os.getenv("CHAT_ID", "8151125157")
-
-# Rotate User-Agent to avoid blocks
-USER_AGENTS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.101 Safari/537.36"
-]
-
-# Flask app for Render Web Service
 app = Flask(__name__)
 
 @app.route('/')
-def keep_alive():
-    logger.debug("Received request to keep_alive endpoint")
-    return "Bot is running!"
+def send_trending():
+    RSS_URL = 'https://trends.google.com/trending/rss?geo=KR'
+    TELEGRAM_BOT_TOKEN = '7634402374:AAGzwu9D-s_1MLgVWwoKl4WkvD8L1b0rUXA'
+    TELEGRAM_CHAT_ID = '8151125157'
 
-@app.route('/health')
-def health_check():
-    logger.debug("Health check endpoint called")
-    return f"Bot running since {start_time.strftime('%Y-%m-%d %H:%M:%S')}"
+    feed = feedparser.parse(RSS_URL)
+    entries = feed.entries[:10]
 
-# Global start time for health check
-start_time = datetime.now()
-logger.info(f"Process started at {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    message = "Top 10 Trending Searches in Korea:\n"
+    for i, entry in enumerate(entries, 1):
+        message += f"{i}. {entry.title}\n"
 
-async def get_google_trends() -> list:
-    """Scrape top 10 trending topics from getdaytrends.com for the US."""
-    logger.debug("Fetching Google Trends via scraping...")
-    try:
-        url = "https://getdaytrends.com/united-states/"
-        headers = {"User-Agent": choice(USER_AGENTS)}
-        response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code != 200:
-            logger.error(f"Failed to fetch page. Status code: {response.status_code}")
-            return [f"Failed to fetch page: {response.status_code}"]
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {
+        'chat_id': TELEGRAM_CHAT_ID,
+        'text': message
+    }
 
-        soup = BeautifulSoup(response.text, "html.parser")
-        trend_elements = soup.select("table tbody tr td a")[:10]
-        trends = [element.text.strip() for element in trend_elements]
-
-        if not trends:
-            logger.warning("No trends found or parsing failed.")
-            return ["No trends found at this moment."]
-
-        logger.info(f"Fetched {len(trends)} trends.")
-        return trends
-
-    except requests.RequestException as e:
-        logger.error(f"Network error fetching trends: {e}")
-        return [f"Network error: {str(e)}"]
-    except Exception as e:
-        logger.error(f"Error fetching trends: {e}")
-        return [f"Error fetching trends: {str(e)}"]
-
-async def send_trends() -> None:
-    """Fetches and sends the Google Trends list."""
-    logger.debug("Sending trends...")
-    try:
-        bot = Bot(token=BOT_TOKEN)
-        trends = await get_google_trends()
-
-        if trends and trends[0] != "No trends found at this moment." and not trends[0].startswith("Error"):
-            message = "Top 10 Google Trends:\n\n" + "\n".join([f"{i+1}. {t}" for i, t in enumerate(trends)])
-            logger.info("Prepared trends message.")
-        else:
-            message = trends[0] if trends and len(trends) == 1 else "Could not fetch trends."
-            logger.warning(f"Prepared message: {message}")
-
-        await bot.send_message(chat_id=CHAT_ID, text=message)  # Async in v20.8
-        logger.info(f"Message sent to chat ID: {CHAT_ID}")
-
-    except TelegramError as e:
-        logger.error(f"Telegram error sending message: {e}")
-    except Exception as e:
-        logger.error(f"An unexpected error occurred: {e}")
-
-def run_scheduler():
-    """Run the scheduler to send trends every 3 minutes from start time."""
-    logger.info("Starting scheduler...")
-    while True:
-        try:
-            # Log current time and process status
-            logger.debug(f"Scheduler loop running at {datetime.now().strftime('%H:%M:%S')}")
-
-            # Send trends
-            logger.info("Executing send_trends...")
-            asyncio.run(send_trends())
-
-            # Sleep for 3 minutes
-            logger.debug("Waiting 180 seconds for next send...")
-            time.sleep(180)
-
-        except Exception as e:
-            logger.error(f"Scheduler error: {e}. Retrying in 30 seconds...")
-            time.sleep(30)  # Wait before retrying
-
-if __name__ == "__main__":
-    logger.info("Starting the bot...")
-    try:
-        import requests
-        import bs4
-        import telegram
-        import flask
-    except ImportError:
-        logger.error("Required packages missing. Installing...")
-        import os
-        os.system("pip install requests beautifulsoup4 python-telegram-bot==20.8 flask==2.3.2")
-
-    # Start Flask server in a separate thread
-    threading.Thread(
-        target=lambda: app.run(
-            host='0.0.0.0',
-            port=int(os.getenv("PORT", 8080)),
-            debug=False,
-            use_reloader=False  # Prevent Flask from restarting
-        ),
-        daemon=True
-    ).start()
-
-    # Send trends immediately for testing
-    logger.info("Sending initial trends message...")
-    asyncio.run(send_trends())
-
-    # Run scheduler in the main thread
-    run_scheduler()
+    requests.post(url, data=payload)
+    return "Sent to Telegram!"
