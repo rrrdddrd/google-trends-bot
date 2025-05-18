@@ -1,44 +1,53 @@
 from flask import Flask
-from datetime import datetime, timedelta
 import feedparser
 import requests
 import os
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
-TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
-TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
-
-def is_on_the_hour():
-    now = datetime.utcnow() + timedelta(hours=9)  # Korea time
-    return now.minute == 0
-
-def is_allowed_hour():
-    now = datetime.utcnow() + timedelta(hours=9)  # Korea time
-    return 6 <= now.hour <= 22  # From 06:00 to 22:59
-
+@app.route("/")
 def send_trending():
-    kr_feed = feedparser.parse('https://trends.google.com/trending/rss?geo=KR')
-    kr_titles = [f"[{entry.title}]" for entry in kr_feed.entries[:10]]
+    # Use Korea time (UTC+9)
+    now = datetime.utcnow() + timedelta(hours=9)
+    hour = now.hour
+    minute = now.minute
 
+    # Block messages during 23:02–05:58
+    if (hour == 23 and minute > 1) or (0 <= hour < 5) or (hour == 5 and minute < 59):
+        return f"Quiet hours — no message sent at {now.strftime('%H:%M')}"
+
+    # Only send message at o'clock
+    if minute != 0:
+        return f"Not on the hour — current time: {now.strftime('%H:%M')}"
+
+    TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+    TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
+
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        return "Bot token or chat ID not set!"
+
+    # Get KR and US trends
+    kr_feed = feedparser.parse('https://trends.google.com/trending/rss?geo=KR')
     us_feed = feedparser.parse('https://trends.google.com/trending/rss?geo=US')
+
+    kr_titles = [f"[{entry.title}]" for entry in kr_feed.entries[:10]]
     us_titles = [f"({entry.title})" for entry in us_feed.entries[:10]]
 
+    # Format message
     message = " ".join(kr_titles) + "\n" + " ".join(us_titles)
 
+    # Send Telegram message
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {'chat_id': TELEGRAM_CHAT_ID, 'text': message}
-    response = requests.post(url, data=payload)
-    print(f"Sent: {response.status_code}")
-    return response.status_code
 
-@app.route("/")
-def index():
-    if is_on_the_hour() and is_allowed_hour():
-        send_trending()
-        return "Message sent."
-    else:
-        return "Not time to send message."
+    response = requests.post(url, data=payload)
+
+    if response.status_code != 200:
+        return f"Failed to send: {response.text}"
+
+    return f"Message sent at {now.strftime('%H:%M')}"
 
 if __name__ == "__main__":
-    app.run()
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
