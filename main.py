@@ -22,7 +22,7 @@ def send_trending():
     kr_feed = feedparser.parse('https://trends.google.com/trending/rss?geo=KR')
     kr_titles = [f"[{entry.title}]" for entry in kr_feed.entries[:10]]
 
-    # U.S. trends
+    # U.S. trends 
     us_feed = feedparser.parse('https://trends.google.com/trending/rss?geo=US')
     us_titles = [f"({entry.title})" for entry in us_feed.entries[:10]]
 
