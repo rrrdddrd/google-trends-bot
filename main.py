@@ -13,16 +13,16 @@ def send_trending():
     hour = now.hour
     minute = now.minute
 
-    # Block messages during 23:02–05:58
-    if (hour == 23 and minute > 1) or (0 <= hour < 5) or (hour == 5 and minute < 59):
+    # Block messages during 23:01–05:59
+    if (hour == 23 and minute >= 1) or (0 <= hour < 6):
         return f"Quiet hours — no message sent at {now.strftime('%H:%M')}"
 
     # Only send message at o'clock
     if minute != 0:
         return f"Not on the hour — current time: {now.strftime('%H:%M')}"
 
-    TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
-    TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
+    TELEGRAM_BOT_TOKEN = os.environ.get('BOT_TOKEN')
+    TELEGRAM_CHAT_ID = os.environ.get('CHAT_ID')
 
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         return "Bot token or chat ID not set!"
