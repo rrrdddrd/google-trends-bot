@@ -40,11 +40,15 @@ def send_trending():
     kr_feed = feedparser.parse('https://trends.google.com/trending/rss?geo=KR')
     us_feed = feedparser.parse('https://trends.google.com/trending/rss?geo=US')
 
-    # Filter KR keywords to exclude Vietnamese, fill in extras if needed
+    # Filter KR keywords to exclude Vietnamese and " vs ", and fill to 10
     filtered_kr_titles = []
     for entry in kr_feed.entries:
-        if not VIETNAMESE_CHAR_PATTERN.search(entry.title):
-            filtered_kr_titles.append(f"[{entry.title}]")
+        title = entry.title
+        if VIETNAMESE_CHAR_PATTERN.search(title):
+            continue
+        if " vs " in title.lower():  # case insensitive match
+            continue
+        filtered_kr_titles.append(f"[{title}]")
         if len(filtered_kr_titles) == 10:
             break
 
